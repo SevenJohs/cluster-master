@@ -1,0 +1,118 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>聚合图层</title>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.10/js/esri/css/esri.css">
+    <style>
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        * {
+            margin: 0 0;
+            padding: 0 0;
+        }
+    </style>
+    <script type="text/javascript">
+        var dojoConfig = (function () {
+            var path_location = location.pathname.replace(/\/[^/]+$/, '');
+            console.info(path_location);
+            return {
+                async: true,
+                isDebug: true,
+                packages: [{
+                    name: "App",
+                    location: path_location + "/LH"
+                }]
+            };
+        })();
+    </script>
+    <script src="http://js.arcgis.com/3.10/"></script>
+    <script type="text/javascript">
+        require([
+            "dojo/on",
+            "App/cluster",
+            "esri/tasks/QueryTask",
+            "esri/tasks/query",
+            "esri/geometry/Extent",
+            "esri/map",
+            "esri/request",
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/symbols/PictureMarkerSymbol",
+            "esri/renderers/ClassBreaksRenderer",
+            "esri/layers/ArcGISTiledMapServiceLayer",
+            "esri/layers/ArcGISDynamicMapServiceLayer",
+            "dojo/domReady!"
+        ], function (on, cluster, QueryTask, Query, Extent, Map, esriRequest, SimpleMarkerSymbol, SimpleFillSymbol, PictureMarkerSymbol, ClassBreaksRenderer, ArcGISTiledMapServiceLayer, ArcGISDynamicMapServiceLayer) {
+            var map, cl, basmapUrl, queryLayerID;
+
+            function init() {
+                map = new Map("map", {});
+                on(map, 'load', function (theMap) {
+                    runQuery();
+                });
+                basmapUrl = "http://211.101.37.251:6080/arcgis/rest/services/SXGXPTMAP/MapServer";
+                queryLayerID = 221;
+                var layersRequest = esriRequest({
+                    url: basmapUrl,
+                    content: {f: "json"},
+                    handleAs: "json",
+                    callbackParamName: "callback"
+                });
+                layersRequest.then(
+                        function (response) {
+                            var isTileLayer = response.singleFusedMapCache;
+                            try {
+                                var layer = null;
+                                if (isTileLayer) {
+                                    layer = new ArcGISTiledMapServiceLayer(basmapUrl, {});
+                                }
+                                else {
+                                    layer = new ArcGISDynamicMapServiceLayer(basmapUrl, {});
+                                }
+                                if (layer) {
+                                    map.addLayer(layer);
+                                }
+                            }
+                            catch (err) {
+                                console.error("加载: " + basmapUrl + "失败!");
+                            }
+                        }, function (error) {
+                            console.log("错误: ", error.message);
+                        });
+            }
+
+            function runQuery() {
+                var queryTask = new QueryTask(basmapUrl + "/" + queryLayerID);
+                var query = new Query();
+                query.returnGeometry = true;
+                query.where = '1=1';
+                query.outFields = ["*"];
+                on(queryTask, "complete", function (featureSet) {
+                    cl = new cluster.ClusterLayer({
+                        map: map,
+                        displayOnPan: true,
+                        esriGraphics: featureSet.featureSet.features
+                    }, function (err) {
+
+                    });
+
+//                    var render = buildRender();
+//                    cl.setRenderer(render);
+                    map.addLayer(cl);
+                });
+                queryTask.execute(query);
+            }
+
+            init();
+        });
+
+    </script>
+</head>
+<body class="claro">
+<div id="map"></div>
+</body>
+</html>
